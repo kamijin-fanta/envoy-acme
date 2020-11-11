@@ -1,0 +1,71 @@
+node:
+  id: node0
+  cluster: cluster.local
+
+admin:
+  access_log_path: /dev/null
+  profile_path: /dev/null
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8111
+static_resources:
+  # secrets:
+  # - name: server_cert
+  #   tls_certificate:
+  #     certificate_chain:
+  #       filename: hoge.crt
+  #     private_key:
+  #       filename: hoge.key
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 8123 }
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          stat_prefix: ingress_http
+          route_config:
+            name: route
+            virtual_hosts:
+            - name: app_service
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: hello envoy
+          http_filters:
+          - name: envoy.router
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificate_sds_secret_configs:
+            - name: "metrics.dempa.moe"
+              sds_config:
+                resource_api_version: v3
+                api_config_source:
+                  api_type: GRPC
+                  transport_api_version: v3
+                  grpc_services:
+                    envoy_grpc:
+                      cluster_name: xds_cluster
+                    initial_metadata:
+                      - key: x-hoge-token
+                        value: fugafugafuga
+  clusters:
+  - name: xds_cluster
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: xds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: {address: 127.0.0.1, port_value: 20000 }

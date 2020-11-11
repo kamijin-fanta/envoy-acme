@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -15,8 +16,10 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/file_store"
+	"github.com/kamijin-fanta/envoy-acme-sds/pkg/xds_service"
 	"github.com/urfave/cli/v2"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -32,44 +35,44 @@ func main() {
 		Name: "envoy-acme-sds",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "ca-dir",
-				Value: "https://acme-staging-v02.api.letsencrypt.org/directory", // todo
+				Name:    "ca-dir",
+				Value:   "https://acme-staging-v02.api.letsencrypt.org/directory", // todo
 				EnvVars: []string{"CA_DIR"},
 			},
 			&cli.StringFlag{
-				Name:  "email",
-				EnvVars: []string{"EMAIL"},
+				Name:     "email",
+				EnvVars:  []string{"EMAIL"},
 				Required: true,
 			},
 			&cli.StringFlag{
-				Name:  "dns01-provider",
-				EnvVars: []string{"DNS01_PROVIDER"},
+				Name:     "dns01-provider",
+				EnvVars:  []string{"DNS01_PROVIDER"},
 				Required: true,
 			},
 			&cli.StringFlag{
-				Name:  "domains",
-				EnvVars: []string{"DOMAINS"},
+				Name:     "domains",
+				EnvVars:  []string{"DOMAINS"},
 				Required: true,
 			},
 			&cli.IntFlag{
-				Name:  "cert-days",
+				Name:    "cert-days",
 				EnvVars: []string{"CERT_DAYS"},
-				Value: 25,
+				Value:   25,
 			},
 			&cli.StringFlag{
-				Name:  "file-store-dir",
+				Name:    "file-store-dir",
 				EnvVars: []string{"FILE_STORE_DIR"},
-				Value: "./data",
+				Value:   "./data",
 			},
 		},
-		Action: func(context *cli.Context) error {
+		Action: func(c *cli.Context) error {
 			config := &acmeProcessConfig{
-				caDir:             context.String("ca-dir"),
-				email:             context.String("email"),
-				dns01ProviderName: context.String("dns01-provider"),
-				domains:           strings.Split(context.String("domains"), ","),
-				remainDays:        context.Int("cert-days"),
-				dataDir:           context.String("file-store-dir"),
+				caDir:             c.String("ca-dir"),
+				email:             c.String("email"),
+				dns01ProviderName: c.String("dns01-provider"),
+				domains:           strings.Split(c.String("domains"), ","),
+				remainDays:        c.Int("cert-days"),
+				dataDir:           c.String("file-store-dir"),
 			}
 
 			os.MkdirAll(config.dataDir, 0700)
@@ -77,6 +80,25 @@ func main() {
 
 			acmeProcess(config, fileStore)
 
+			update := make(chan *xds_service.Notification, 5)
+			r, err := fileStore.FetchResource(config.domains[0])
+			if err != nil {
+				panic(err)
+			}
+			update <- &xds_service.Notification{
+				Certificates: []*store.Certificates{r},
+			}
+
+			xds := xds_service.NewXdsService()
+			ctx := context.Background()
+			lis, err := net.Listen("tcp", "127.0.0.1:20000")
+			if err != nil {
+				panic(err)
+			}
+			err = xds.RunServer(ctx, lis, update)
+			if err != nil {
+				panic(err)
+			}
 
 			return nil
 		},

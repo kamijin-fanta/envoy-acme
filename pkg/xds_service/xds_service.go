@@ -10,7 +10,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/server/v3"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
+	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"net"
@@ -30,14 +30,10 @@ var _ cache.NodeHash = &StandardNodeHash{}
 
 type StandardNodeHash struct{}
 
-type Notification struct {
-	Certificates []*store.Certificates
-}
-
 func (s *StandardNodeHash) ID(node *envoy_config_core_v3.Node) string {
 	return "default"
 }
-func (x *XdsService) RunServer(ctx context.Context, listener net.Listener, update chan *Notification) error {
+func (x *XdsService) RunServer(ctx context.Context, listener net.Listener, update chan *common.Notification) error {
 	callback := server.CallbackFuncs{
 		StreamOpenFunc: func(ctx context.Context, i int64, s string) error {
 			md, ok := metadata.FromIncomingContext(ctx)
@@ -73,7 +69,7 @@ func (x *XdsService) RunServer(ctx context.Context, listener net.Listener, updat
 	return grpcServer.Serve(listener)
 }
 
-func generateSnapshot(notification *Notification) cache.Snapshot {
+func generateSnapshot(notification *common.Notification) cache.Snapshot {
 	var resources []types.Resource
 
 	for _, cert := range notification.Certificates {

@@ -15,8 +15,10 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/file_store"
+	"github.com/urfave/cli/v2"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -26,17 +28,77 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	caDir := "https://acme-staging-v02.api.letsencrypt.org/directory"
-	email := "test@you.com"
-	dns01ProviderName := "sakuracloud"
-	domains := []string{"metrics.dempa.moe", "*.metrics.dempa.moe"}
-	remainDays := 10
-	dataDir := "./data"
+	app := &cli.App{
+		Name: "envoy-acme-sds",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "ca-dir",
+				Value: "https://acme-staging-v02.api.letsencrypt.org/directory", // todo
+				EnvVars: []string{"CA_DIR"},
+			},
+			&cli.StringFlag{
+				Name:  "email",
+				EnvVars: []string{"EMAIL"},
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "dns01-provider",
+				EnvVars: []string{"DNS01_PROVIDER"},
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  "domains",
+				EnvVars: []string{"DOMAINS"},
+				Required: true,
+			},
+			&cli.IntFlag{
+				Name:  "cert-days",
+				EnvVars: []string{"CERT_DAYS"},
+				Value: 25,
+			},
+			&cli.StringFlag{
+				Name:  "file-store-dir",
+				EnvVars: []string{"FILE_STORE_DIR"},
+				Value: "./data",
+			},
+		},
+		Action: func(context *cli.Context) error {
+			config := &acmeProcessConfig{
+				caDir:             context.String("ca-dir"),
+				email:             context.String("email"),
+				dns01ProviderName: context.String("dns01-provider"),
+				domains:           strings.Split(context.String("domains"), ","),
+				remainDays:        context.Int("cert-days"),
+				dataDir:           context.String("file-store-dir"),
+			}
 
-	os.MkdirAll(dataDir, 0700)
-	fileStore := file_store.NewFileStore(dataDir)
+			os.MkdirAll(config.dataDir, 0700)
+			fileStore := file_store.NewFileStore(config.dataDir)
 
-	resource, err := fileStore.FetchResource(domains[0])
+			acmeProcess(config, fileStore)
+
+
+			return nil
+		},
+	}
+
+	err = app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+type acmeProcessConfig struct {
+	caDir             string
+	email             string
+	dns01ProviderName string
+	domains           []string
+	remainDays        int
+	dataDir           string
+}
+
+func acmeProcess(config *acmeProcessConfig, fileStore *file_store.FileStore) {
+	resource, err := fileStore.FetchResource(config.domains[0])
 	if errors.Is(err, store.ErrNotFoundCertificate) {
 		// nop
 	} else if err != nil {
@@ -51,14 +113,14 @@ func main() {
 			log.Fatalf("certs not found")
 		}
 
-		if !needRenewal(certs[0], remainDays) {
+		if !needRenewal(certs[0], config.remainDays) {
 			log.Println("not need renewal")
 			return
 		}
 		log.Println("need renewal")
 	}
 
-	account, err := fileStore.FetchUser(caDir, email)
+	account, err := fileStore.FetchUser(config.caDir, config.email)
 	if errors.Is(err, store.ErrNotFoundUser) {
 		// regist new user
 		log.Println("generate user private key")
@@ -68,12 +130,12 @@ func main() {
 			log.Fatal(err)
 		}
 
-		newAccount := store.NewAccount(email, privateKey)
-		config := lego.NewConfig(newAccount)
+		newAccount := store.NewAccount(config.email, privateKey)
+		clientConfig := lego.NewConfig(newAccount)
 
-		config.CADirURL = caDir
+		clientConfig.CADirURL = config.caDir
 
-		client, err := lego.NewClient(config)
+		client, err := lego.NewClient(clientConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -85,7 +147,7 @@ func main() {
 		newAccount.Registration = reg
 		account = newAccount
 
-		err = fileStore.WriteUser(caDir, newAccount)
+		err = fileStore.WriteUser(config.caDir, newAccount)
 		if err != nil {
 			log.Fatalf("write user error %v", err)
 		}
@@ -93,16 +155,16 @@ func main() {
 		log.Fatalf("error on fetch user %v", err)
 	}
 
-	config := lego.NewConfig(account)
-	config.Certificate.KeyType = certcrypto.RSA2048
-	config.CADirURL = caDir
+	clientConfig := lego.NewConfig(account)
+	clientConfig.Certificate.KeyType = certcrypto.RSA2048
+	clientConfig.CADirURL = config.caDir
 
-	client, err := lego.NewClient(config)
+	client, err := lego.NewClient(clientConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	provider, err := dns.NewDNSChallengeProviderByName(dns01ProviderName)
+	provider, err := dns.NewDNSChallengeProviderByName(config.dns01ProviderName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -114,7 +176,7 @@ func main() {
 	fmt.Printf("start acme processes...\n")
 
 	request := certificate.ObtainRequest{
-		Domains: domains,
+		Domains: config.domains,
 		Bundle:  true,
 	}
 	certificates, err := client.Certificate.Obtain(request)
@@ -124,7 +186,7 @@ func main() {
 
 	fmt.Printf("%#v\n", certificates)
 
-	err = fileStore.WriteResource(domains[0], store.NewStoreResource(certificates))
+	err = fileStore.WriteResource(config.domains[0], store.NewStoreResource(certificates))
 	if err != nil {
 		log.Fatalf("issue certificate error %v", err)
 	}

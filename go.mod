@@ -20,6 +20,7 @@ require (
 	github.com/miekg/dns v1.1.35 // indirect
 	github.com/oracle/oci-go-sdk v24.3.0+incompatible // indirect
 	github.com/stretchr/testify v1.6.1
+	github.com/urfave/cli/v2 v2.3.0
 	github.com/vultr/govultr v1.1.1 // indirect
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20201031054903-ff519b6c9102 // indirect

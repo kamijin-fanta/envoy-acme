@@ -2,18 +2,17 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"github.com/ghodss/yaml"
 	"github.com/joho/godotenv"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/acme_service"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/file_store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/xds_service"
 	"github.com/urfave/cli/v2"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -31,21 +30,21 @@ func main() {
 				Value:   "https://acme-staging-v02.api.letsencrypt.org/directory", // todo
 				EnvVars: []string{"CA_DIR"},
 			},
-			&cli.StringFlag{
-				Name:     "email",
-				EnvVars:  []string{"EMAIL"},
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:     "dns01-provider",
-				EnvVars:  []string{"DNS01_PROVIDER"},
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:     "domains",
-				EnvVars:  []string{"DOMAINS"},
-				Required: true,
-			},
+			//&cli.StringFlag{
+			//	Name:     "email",
+			//	EnvVars:  []string{"EMAIL"},
+			//	Required: true,
+			//},
+			//&cli.StringFlag{
+			//	Name:     "dns01-provider",
+			//	EnvVars:  []string{"DNS01_PROVIDER"},
+			//	Required: true,
+			//},
+			//&cli.StringFlag{
+			//	Name:     "domains",
+			//	EnvVars:  []string{"DOMAINS"},
+			//	Required: true,
+			//},
 			&cli.IntFlag{
 				Name:    "cert-days",
 				EnvVars: []string{"CERT_DAYS"},
@@ -66,22 +65,42 @@ func main() {
 				EnvVars: []string{"INTERVAL"},
 				Value:   1 * time.Hour,
 			},
+			&cli.StringFlag{
+				Name:    "config",
+				Aliases: []string{"c"},
+				EnvVars: []string{"CONFIG_FILE"},
+				Value:   "sites.yaml",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			config := &acme_service.AcmeProcessConfig{
-				CaDir:             c.String("ca-dir"),
-				Email:             c.String("email"),
-				Dns01ProviderName: c.String("dns01-provider"),
-				Domains:           strings.Split(c.String("domains"), ","),
-				RemainDays:        c.Int("cert-days"),
-				DataDir:           c.String("file-store-dir"),
-				Interval:          c.Duration("interval"),
+				CaDir: c.String("ca-dir"),
+				//Email:             c.String("email"),
+				//Dns01ProviderName: c.String("dns01-provider"),
+				//Domains:           strings.Split(c.String("domains"), ","),
+				RemainDays: c.Int("cert-days"),
+				DataDir:    c.String("file-store-dir"),
+				Interval:   c.Duration("interval"),
+			}
+			sitesConfig := &common.SitesConfig{}
+			f, err := os.Open(c.String("config"))
+			if err != nil {
+				panic(err)
+			}
+			configBytes, err := ioutil.ReadAll(f)
+			if err != nil {
+				panic(err)
+			}
+			f.Close()
+			err = yaml.Unmarshal(configBytes, sitesConfig)
+			if err != nil {
+				panic(err)
 			}
 
 			os.MkdirAll(config.DataDir, 0700)
 			fileStore := file_store.NewFileStore(config.DataDir)
 
-			acmeService := acme_service.NewAcmeService(config, fileStore)
+			acmeService := acme_service.NewAcmeService(config, sitesConfig, fileStore)
 			//acmeService.FetchCertificate()
 			acmeService.StartLoop()
 
@@ -102,13 +121,7 @@ func main() {
 				stop <- struct{}{}
 			}()
 
-			r, err := fileStore.FetchResource(config.Domains[0])
-			if err != nil {
-				fmt.Printf("initial fetch error %v\n", err)
-			}
-			update <- &common.Notification{
-				Certificates: []*store.Certificates{r},
-			}
+			acmeService.FireNotification()
 
 			<-stop
 			return nil

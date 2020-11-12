@@ -16,18 +16,22 @@ import (
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/file_store"
 	"log"
+	"os"
+	"strings"
 	"time"
 )
 
 type AcmeService struct {
 	Config              *AcmeProcessConfig
+	SitesConfig         *common.SitesConfig
 	FileStore           *file_store.FileStore
 	notificationChannel chan *common.Notification
 }
 
-func NewAcmeService(config *AcmeProcessConfig, fileStore *file_store.FileStore) *AcmeService {
+func NewAcmeService(config *AcmeProcessConfig, sitesConfig *common.SitesConfig, fileStore *file_store.FileStore) *AcmeService {
 	return &AcmeService{
 		Config:              config,
+		SitesConfig:         sitesConfig,
 		FileStore:           fileStore,
 		notificationChannel: make(chan *common.Notification),
 	}
@@ -50,15 +54,34 @@ func (a *AcmeService) NotificationChannel() chan *common.Notification {
 func (a *AcmeService) StartLoop() {
 	go func() {
 		for {
-			func() {
-				defer func() {
-					if e := recover(); e != nil {
-						log.Printf("fetch certificate panic %v\n", e)
+			sitesChanges := false
+			for _, site := range a.SitesConfig.Sites {
+				func() {
+					defer func() {
+						if e := recover(); e != nil {
+							log.Printf("fetch certificate panic on %s %v\n", site.Name, e)
+						}
+					}()
+					fmt.Printf("Start check certificate for %s\n", site.Name)
+
+					// unset all relative env vars
+					for _, site := range a.SitesConfig.Sites {
+						for _, env := range site.LegoEnv {
+							vars := strings.Split(env, "=")
+							os.Unsetenv(vars[0])
+						}
+					}
+					result := a.FetchCertificate(site)
+					if result {
+						sitesChanges = true
 					}
 				}()
-				fmt.Printf("Start check certificate\n")
-				a.FetchCertificate()
-			}()
+			}
+
+			if sitesChanges {
+				a.FireNotification()
+			}
+
 			// wait for timer
 			t := time.NewTimer(a.Config.Interval)
 			<-t.C
@@ -66,8 +89,8 @@ func (a *AcmeService) StartLoop() {
 	}()
 }
 
-func (a *AcmeService) FetchCertificate() {
-	resource, err := a.FileStore.FetchResource(a.Config.Domains[0])
+func (a *AcmeService) FetchCertificate(site *common.Site) bool {
+	resource, err := a.FileStore.FetchResource(site.Name)
 	if errors.Is(err, store.ErrNotFoundCertificate) {
 		// nop
 	} else if err != nil {
@@ -84,22 +107,22 @@ func (a *AcmeService) FetchCertificate() {
 
 		if !needRenewal(certs[0], a.Config.RemainDays) {
 			log.Println("not need renewal")
-			return
+			return false
 		}
 		log.Println("need renewal")
 	}
 
-	account, err := a.FileStore.FetchUser(a.Config.CaDir, a.Config.Email)
+	account, err := a.FileStore.FetchUser(a.Config.CaDir, site.Email)
 	if errors.Is(err, store.ErrNotFoundUser) {
 		// regist new user
 		log.Println("generate user private key")
 
 		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err) // todo fix
 		}
 
-		newAccount := store.NewAccount(a.Config.Email, privateKey)
+		newAccount := store.NewAccount(site.Email, privateKey)
 		clientConfig := lego.NewConfig(newAccount)
 
 		clientConfig.CADirURL = a.Config.CaDir
@@ -130,39 +153,64 @@ func (a *AcmeService) FetchCertificate() {
 
 	client, err := lego.NewClient(clientConfig)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // todo fix
 	}
 
-	provider, err := dns.NewDNSChallengeProviderByName(a.Config.Dns01ProviderName)
+	// set EnvVars
+	for _, env := range site.LegoEnv {
+		vars := strings.Split(env, "=")
+		if len(vars) != 2 {
+			fmt.Printf("ignore invalid env vars %s\n", env)
+			continue
+		}
+		err := os.Setenv(vars[0], vars[1])
+		fmt.Printf("set env %v %v\n", vars[0], vars[1])
+		if err != nil {
+			panic(err)
+		}
+	}
+	provider, err := dns.NewDNSChallengeProviderByName(site.Provider)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // todo fix
 	}
 	err = client.Challenge.SetDNS01Provider(provider)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // todo fix
 	}
 
 	fmt.Printf("start acme processes...\n")
 
 	request := certificate.ObtainRequest{
-		Domains: a.Config.Domains,
+		Domains: site.Domains,
 		Bundle:  true,
 	}
 	certificates, err := client.Certificate.Obtain(request)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // todo fix
 	}
 	certResource := store.NewStoreResource(certificates)
 
-	a.notificationChannel <- &common.Notification{
-		Certificates: []*store.Certificates{certResource}, // todo
-	}
+	fmt.Printf("%s\n", certificates.Certificate)
 
-	fmt.Printf("%#v\n", certificates)
-
-	err = a.FileStore.WriteResource(a.Config.Domains[0], certResource)
+	err = a.FileStore.WriteResource(site.Name, certResource)
 	if err != nil {
-		log.Fatalf("issue certificate error %v", err)
+		log.Fatalf("issue certificate error %v", err) // todo fix
+	}
+	return true
+}
+
+func (a *AcmeService) FireNotification() {
+	certs := make([]*store.Certificates, 0, len(a.SitesConfig.Sites))
+	for _, site := range a.SitesConfig.Sites {
+		cert, err := a.FileStore.FetchResource(site.Name)
+		if err != nil {
+			fmt.Printf("error on fetch resource %v\n", err)
+			continue
+		}
+		certs = append(certs, cert)
+	}
+	a.notificationChannel <- &common.Notification{
+		Certificates: certs,
 	}
 }
 

@@ -37,9 +37,11 @@ func NewAcmeService(config *AcmeProcessConfig, sitesConfig *common.SitesConfig, 
 }
 
 type AcmeProcessConfig struct {
-	CaDir      string
-	RemainDays int
-	Interval   time.Duration
+	CaDir       string
+	RemainDays  int
+	Interval    time.Duration
+	LockTimeout time.Duration
+	InstanceId  string
 }
 
 func (a *AcmeService) NotificationChannel() chan *common.Notification {
@@ -52,6 +54,25 @@ func (a *AcmeService) StartLoop() {
 			sitesChanges := false
 			for _, site := range a.SitesConfig.Sites {
 				func() {
+					for retry := 0; true; retry += 1 {
+						ok, err := a.Store.Lock(a.Config.InstanceId, a.Config.LockTimeout)
+						if err != nil {
+							log.Printf("fetch lock error retry=%d %v %v", retry, ok, err)
+						}
+						if ok {
+							// success!
+							break
+						}
+						if retry > 10 {
+							log.Printf("Skip because the lock cannot be obtained. %s\n", site.Name)
+							return
+						}
+						fmt.Printf("fetch lock failed retry=%d wait\n", retry)
+						time.Sleep(5 * time.Second)
+					}
+					defer a.Store.Release(a.Config.InstanceId)
+					fmt.Printf("get lock %s\n", a.Config.InstanceId)
+
 					defer func() {
 						if e := recover(); e != nil {
 							log.Printf("fetch certificate panic on %s %v\n", site.Name, e)

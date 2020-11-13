@@ -11,6 +11,7 @@ import (
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/consul_store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/file_store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/xds_service"
+	"github.com/rs/xid"
 	"github.com/urfave/cli/v2"
 	"io/ioutil"
 	"log"
@@ -48,6 +49,11 @@ func main() {
 				EnvVars: []string{"INTERVAL"},
 				Value:   1 * time.Hour,
 			},
+			&cli.DurationFlag{
+				Name:    "lock-timeout",
+				EnvVars: []string{"LOCK_TIMEOUT"},
+				Value:   10 * time.Minute,
+			},
 			&cli.StringFlag{
 				Name:    "config",
 				Aliases: []string{"c"},
@@ -72,9 +78,11 @@ func main() {
 		},
 		Action: func(c *cli.Context) error {
 			config := &acme_service.AcmeProcessConfig{
-				CaDir:      c.String("ca-dir"),
-				RemainDays: c.Int("cert-days"),
-				Interval:   c.Duration("interval"),
+				CaDir:       c.String("ca-dir"),
+				RemainDays:  c.Int("cert-days"),
+				Interval:    c.Duration("interval"),
+				LockTimeout: c.Duration("lock-timeout"),
+				InstanceId:  xid.New().String(),
 			}
 			sitesConfig := &common.SitesConfig{}
 			f, err := os.Open(c.String("config"))

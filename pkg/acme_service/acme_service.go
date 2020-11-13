@@ -14,7 +14,6 @@ import (
 	"github.com/go-acme/lego/v4/registration"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/file_store"
 	"log"
 	"os"
 	"strings"
@@ -24,27 +23,23 @@ import (
 type AcmeService struct {
 	Config              *AcmeProcessConfig
 	SitesConfig         *common.SitesConfig
-	FileStore           *file_store.FileStore
+	Store               store.Store
 	notificationChannel chan *common.Notification
 }
 
-func NewAcmeService(config *AcmeProcessConfig, sitesConfig *common.SitesConfig, fileStore *file_store.FileStore) *AcmeService {
+func NewAcmeService(config *AcmeProcessConfig, sitesConfig *common.SitesConfig, store store.Store) *AcmeService {
 	return &AcmeService{
 		Config:              config,
 		SitesConfig:         sitesConfig,
-		FileStore:           fileStore,
+		Store:               store,
 		notificationChannel: make(chan *common.Notification),
 	}
 }
 
 type AcmeProcessConfig struct {
-	CaDir             string
-	Email             string
-	Dns01ProviderName string
-	Domains           []string
-	RemainDays        int
-	DataDir           string
-	Interval          time.Duration
+	CaDir      string
+	RemainDays int
+	Interval   time.Duration
 }
 
 func (a *AcmeService) NotificationChannel() chan *common.Notification {
@@ -90,7 +85,7 @@ func (a *AcmeService) StartLoop() {
 }
 
 func (a *AcmeService) FetchCertificate(site *common.Site) bool {
-	resource, err := a.FileStore.FetchResource(site.Name)
+	resource, err := a.Store.FetchResource(site.Name)
 	if errors.Is(err, store.ErrNotFoundCertificate) {
 		// nop
 	} else if err != nil {
@@ -112,7 +107,7 @@ func (a *AcmeService) FetchCertificate(site *common.Site) bool {
 		log.Println("need renewal")
 	}
 
-	account, err := a.FileStore.FetchUser(a.Config.CaDir, site.Email)
+	account, err := a.Store.FetchUser(a.Config.CaDir, site.Email)
 	if errors.Is(err, store.ErrNotFoundUser) {
 		// regist new user
 		log.Println("generate user private key")
@@ -139,7 +134,7 @@ func (a *AcmeService) FetchCertificate(site *common.Site) bool {
 		newAccount.Registration = reg
 		account = newAccount
 
-		err = a.FileStore.WriteUser(a.Config.CaDir, newAccount)
+		err = a.Store.WriteUser(a.Config.CaDir, newAccount)
 		if err != nil {
 			log.Fatalf("write user error %v", err)
 		}
@@ -164,7 +159,7 @@ func (a *AcmeService) FetchCertificate(site *common.Site) bool {
 			continue
 		}
 		err := os.Setenv(vars[0], vars[1])
-		fmt.Printf("set env %v %v\n", vars[0], vars[1])
+		fmt.Printf("set env %v\n", vars[0])
 		if err != nil {
 			panic(err)
 		}
@@ -192,7 +187,7 @@ func (a *AcmeService) FetchCertificate(site *common.Site) bool {
 
 	fmt.Printf("%s\n", certificates.Certificate)
 
-	err = a.FileStore.WriteResource(site.Name, certResource)
+	err = a.Store.WriteResource(site.Name, certResource)
 	if err != nil {
 		log.Fatalf("issue certificate error %v", err) // todo fix
 	}
@@ -202,7 +197,7 @@ func (a *AcmeService) FetchCertificate(site *common.Site) bool {
 func (a *AcmeService) FireNotification() {
 	certs := make([]*store.Certificates, 0, len(a.SitesConfig.Sites))
 	for _, site := range a.SitesConfig.Sites {
-		cert, err := a.FileStore.FetchResource(site.Name)
+		cert, err := a.Store.FetchResource(site.Name)
 		if err != nil {
 			fmt.Printf("error on fetch resource %v\n", err)
 			continue

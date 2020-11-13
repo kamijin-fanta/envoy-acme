@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/joho/godotenv"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/acme_service"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
+	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
+	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/consul_store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/file_store"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/xds_service"
 	"github.com/urfave/cli/v2"
@@ -30,30 +33,10 @@ func main() {
 				Value:   "https://acme-staging-v02.api.letsencrypt.org/directory", // todo
 				EnvVars: []string{"CA_DIR"},
 			},
-			//&cli.StringFlag{
-			//	Name:     "email",
-			//	EnvVars:  []string{"EMAIL"},
-			//	Required: true,
-			//},
-			//&cli.StringFlag{
-			//	Name:     "dns01-provider",
-			//	EnvVars:  []string{"DNS01_PROVIDER"},
-			//	Required: true,
-			//},
-			//&cli.StringFlag{
-			//	Name:     "domains",
-			//	EnvVars:  []string{"DOMAINS"},
-			//	Required: true,
-			//},
 			&cli.IntFlag{
 				Name:    "cert-days",
 				EnvVars: []string{"CERT_DAYS"},
 				Value:   25,
-			},
-			&cli.StringFlag{
-				Name:    "file-store-dir",
-				EnvVars: []string{"FILE_STORE_DIR"},
-				Value:   "./data",
 			},
 			&cli.StringFlag{
 				Name:    "xds-listen",
@@ -71,15 +54,26 @@ func main() {
 				EnvVars: []string{"CONFIG_FILE"},
 				Value:   "sites.yaml",
 			},
+			&cli.StringFlag{
+				Name:    "store",
+				EnvVars: []string{"STORE"},
+				Value:   "file",
+			},
+			&cli.StringFlag{
+				Name:    "store-file-base",
+				EnvVars: []string{"STORE_FILE_BASE"},
+				Value:   "./data",
+			},
+			&cli.StringFlag{
+				Name:    "store-consul-prefix",
+				EnvVars: []string{"STORE_CONSUL_PREFIX"},
+				Value:   "envoy-acme-sds/default",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			config := &acme_service.AcmeProcessConfig{
-				CaDir: c.String("ca-dir"),
-				//Email:             c.String("email"),
-				//Dns01ProviderName: c.String("dns01-provider"),
-				//Domains:           strings.Split(c.String("domains"), ","),
+				CaDir:      c.String("ca-dir"),
 				RemainDays: c.Int("cert-days"),
-				DataDir:    c.String("file-store-dir"),
 				Interval:   c.Duration("interval"),
 			}
 			sitesConfig := &common.SitesConfig{}
@@ -97,10 +91,27 @@ func main() {
 				panic(err)
 			}
 
-			os.MkdirAll(config.DataDir, 0700)
-			fileStore := file_store.NewFileStore(config.DataDir)
+			var s store.Store
+			switch c.String("store") {
+			case "file", "FILE":
+				s, err = file_store.NewFileStore(c.String("store-file-base"))
+				if err != nil {
+					panic(err)
+				}
+			case "consul", "CONSUL":
+				prefix := c.String("store-consul-prefix")
+				if prefix == "" {
+					panic(fmt.Sprintf("store-consul-prefix must not empty"))
+				}
+				s, err = consul_store.NewConsulStore(prefix)
+				if err != nil {
+					panic(err)
+				}
+			default:
+				panic(fmt.Sprintf("known store type '%s'", c.String("store")))
+			}
 
-			acmeService := acme_service.NewAcmeService(config, sitesConfig, fileStore)
+			acmeService := acme_service.NewAcmeService(config, sitesConfig, s)
 			//acmeService.FetchCertificate()
 			acmeService.StartLoop()
 

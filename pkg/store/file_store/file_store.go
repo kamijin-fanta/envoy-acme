@@ -1,6 +1,7 @@
 package file_store
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,18 +9,25 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
+	"time"
 )
+
+var _ store.Store = &FileStore{}
 
 type FileStore struct {
 	baseFilePath string
 }
 
-func NewFileStore(base string) *FileStore {
+func NewFileStore(base string) (*FileStore, error) {
+	err := os.MkdirAll(base, 0700)
+	if err != nil {
+		return nil, err
+	}
 	return &FileStore{
 		baseFilePath: base,
-	}
+	}, nil
 }
 
 func (f *FileStore) FetchUser(caServer string, userId string) (*store.Account, error) {
@@ -56,7 +64,7 @@ func (f *FileStore) WriteUser(caServer string, account *store.Account) error {
 		return err
 	}
 
-	jsonBytes, err := json.Marshal(account)
+	jsonBytes, err := json.MarshalIndent(account, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -94,7 +102,7 @@ func (f *FileStore) FetchResource(symbolicDomainName string) (*store.Certificate
 }
 func (f *FileStore) WriteResource(symbolicDomainName string, resource *store.Certificates) error {
 	resourcePath := resourceFilePath(f.baseFilePath, symbolicDomainName)
-	jsonBytes, err := json.Marshal(resource)
+	jsonBytes, err := json.MarshalIndent(resource, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -106,6 +114,66 @@ func (f *FileStore) WriteResource(symbolicDomainName string, resource *store.Cer
 	return nil
 }
 
+func (f *FileStore) Lock(id string, timeout time.Duration) (bool, error) {
+	filePath := lockFilePath(f.baseFilePath)
+	lockFile, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0700)
+	if err != nil {
+		return false, err
+	}
+	defer lockFile.Close()
+	stat, err := lockFile.Stat()
+	if err != nil {
+		return false, err
+	}
+
+	currentContent, err := ioutil.ReadAll(lockFile)
+	if err != nil {
+		return false, err
+	}
+
+	limit := stat.ModTime().Add(timeout)
+	notEmtpy := len(currentContent) != 0
+	notOwned := !bytes.Equal(currentContent, []byte(id))
+	lockAlive := time.Now().Before(limit)
+	//fmt.Printf("comp %v %v %v", notEmtpy, notOwned, lockAlive)
+	//fmt.Printf(" / vars %v %v\n", limit, time.Now())
+	if notEmtpy && notOwned && lockAlive {
+		return false, nil
+	}
+
+	err = lockFile.Truncate(0)
+	if err != nil {
+		return false, err
+	}
+	_, err = lockFile.WriteAt([]byte(id), 0)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+func (f *FileStore) Release(id string) error {
+	filePath := lockFilePath(f.baseFilePath)
+	lockFile, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0700)
+	if err != nil {
+		return err
+	}
+	defer lockFile.Close()
+
+	currentContent, err := ioutil.ReadAll(lockFile)
+	if err != nil {
+		return err
+	}
+
+	if bytes.Equal(currentContent, []byte(id)) {
+		err = lockFile.Truncate(0)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func userFilePath(base, caServer, userId string) (string, error) {
 	serverUrl, err := url.Parse(caServer)
 	if err != nil {
@@ -113,9 +181,13 @@ func userFilePath(base, caServer, userId string) (string, error) {
 	}
 	serverPath := strings.NewReplacer(":", "_", "/", "_").Replace(serverUrl.Host)
 
-	return path.Join(base, fmt.Sprintf("user-%s-%s.json", serverPath, userId)), nil
+	return filepath.Join(base, fmt.Sprintf("user-%s-%s.json", serverPath, userId)), nil
 }
 
 func resourceFilePath(base, domainName string) string {
-	return path.Join(base, fmt.Sprintf("resource-%s.json", domainName))
+	return filepath.Join(base, fmt.Sprintf("resource-%s.json", domainName))
+}
+
+func lockFilePath(base string) string {
+	return filepath.Join(base, "leader")
 }

@@ -17,6 +17,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-acme/lego/v4 v4.1.0
 	github.com/gophercloud/gophercloud v0.13.0 // indirect
+	github.com/hashicorp/consul/api v1.7.0
 	github.com/joho/godotenv v1.3.0
 	github.com/linode/linodego v0.24.0 // indirect
 	github.com/miekg/dns v1.1.35 // indirect

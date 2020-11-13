@@ -5,8 +5,17 @@ import (
 	"errors"
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/certificate"
+	"time"
 )
 
+type Store interface {
+	FetchUser(caServer string, userId string) (*Account, error)
+	WriteUser(caServer string, account *Account) error
+	FetchResource(symbolicDomainName string) (*Certificates, error)
+	WriteResource(symbolicDomainName string, resource *Certificates) error
+	Lock(id string, timeout time.Duration) (bool, error)
+	Release(id string) error
+}
 
 var ErrNotFoundUser = errors.New("not found user")
 var ErrNotFoundCertificate = errors.New("not found certificate resource")

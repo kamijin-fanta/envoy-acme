@@ -1,29 +1,30 @@
-package file_store
+package consul_store
 
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"fmt"
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 )
 
-func TestFileStore(t *testing.T) {
+func TestConsulStore(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	tmpDir, err := ioutil.TempDir("", "acme-file-store")
+	keyPrefix := fmt.Sprintf("envoy-acme-sds/test-%d", time.Now().Unix())
+	consulStore, err := NewConsulStore(keyPrefix)
 	require.Nil(err)
-	defer os.RemoveAll(tmpDir)
 
-	fileStore, err := NewFileStore(tmpDir)
-	require.Nil(err)
+	defer func() {
+		// cleanup
+		consulStore.kvClient.DeleteTree(keyPrefix, nil)
+	}()
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.Nil(err)
@@ -34,10 +35,10 @@ func TestFileStore(t *testing.T) {
 		AccountKey: store.NewAccountKey(privateKey),
 	}
 	LEDirectoryStaging := "https://acme-staging-v02.api.letsencrypt.org/directory"
-	err = fileStore.WriteUser(LEDirectoryStaging, testAccount)
+	err = consulStore.WriteUser(LEDirectoryStaging, testAccount)
 	require.Nil(err)
 
-	account, err := fileStore.FetchUser(LEDirectoryStaging, email)
+	account, err := consulStore.FetchUser(LEDirectoryStaging, email)
 	require.Nil(err)
 	require.NotNil(account)
 	assert.Equal(email, account.Email)
@@ -53,31 +54,31 @@ func TestFileStore(t *testing.T) {
 		IssuerCertificate: []byte("issuer_ertificate"),
 		CSR:               []byte("csr"),
 	})
-	err = fileStore.WriteResource(domain, testResource)
+	err = consulStore.WriteResource(domain, testResource)
 	require.Nil(err)
 
-	response, err := fileStore.FetchResource(domain)
+	response, err := consulStore.FetchResource(domain)
 	require.Nil(err)
 	require.NotNil(response)
 	assert.EqualValues(testResource, response.ToCertificateResource())
 
 	lockTimeout := 100 * time.Millisecond
-	res, err := fileStore.Lock("a", lockTimeout)
+	res, err := consulStore.Lock("a", lockTimeout)
 	require.Nil(err)
 	assert.True(res)
-	res, err = fileStore.Lock("b", lockTimeout)
+	res, err = consulStore.Lock("b", lockTimeout)
 	require.Nil(err)
 	assert.False(res)
 	time.Sleep(lockTimeout)
-	res, err = fileStore.Lock("b", lockTimeout)
+	res, err = consulStore.Lock("b", lockTimeout)
 	require.Nil(err)
 	assert.True(res)
-	res, err = fileStore.Lock("a", lockTimeout)
+	res, err = consulStore.Lock("a", lockTimeout)
 	require.Nil(err)
 	assert.False(res)
-	err = fileStore.Release("b")
+	err = consulStore.Release("b")
 	require.Nil(err)
-	res, err = fileStore.Lock("a", lockTimeout)
+	res, err = consulStore.Lock("a", lockTimeout)
 	require.Nil(err)
 	assert.True(res)
 }

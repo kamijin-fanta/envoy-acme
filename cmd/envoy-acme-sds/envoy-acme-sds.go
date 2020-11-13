@@ -1,21 +1,9 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"github.com/ghodss/yaml"
 	"github.com/joho/godotenv"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/acme_service"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/consul_store"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store/file_store"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/xds_service"
-	"github.com/rs/xid"
 	"github.com/urfave/cli/v2"
-	"io/ioutil"
 	"log"
-	"net"
 	"os"
 	"time"
 )
@@ -76,74 +64,25 @@ func main() {
 				Value:   "envoy-acme-sds/default",
 			},
 		},
-		Action: func(c *cli.Context) error {
-			config := &acme_service.AcmeProcessConfig{
-				CaDir:       c.String("ca-dir"),
-				RemainDays:  c.Int("cert-days"),
-				Interval:    c.Duration("interval"),
-				LockTimeout: c.Duration("lock-timeout"),
-				InstanceId:  xid.New().String(),
-			}
-			sitesConfig := &common.SitesConfig{}
-			f, err := os.Open(c.String("config"))
-			if err != nil {
-				panic(err)
-			}
-			configBytes, err := ioutil.ReadAll(f)
-			if err != nil {
-				panic(err)
-			}
-			f.Close()
-			err = yaml.Unmarshal(configBytes, sitesConfig)
-			if err != nil {
-				panic(err)
-			}
-
-			var s store.Store
-			switch c.String("store") {
-			case "file", "FILE":
-				s, err = file_store.NewFileStore(c.String("store-file-base"))
-				if err != nil {
-					panic(err)
-				}
-			case "consul", "CONSUL":
-				prefix := c.String("store-consul-prefix")
-				if prefix == "" {
-					panic(fmt.Sprintf("store-consul-prefix must not empty"))
-				}
-				s, err = consul_store.NewConsulStore(prefix)
-				if err != nil {
-					panic(err)
-				}
-			default:
-				panic(fmt.Sprintf("known store type '%s'", c.String("store")))
-			}
-
-			acmeService := acme_service.NewAcmeService(config, sitesConfig, s)
-			//acmeService.FetchCertificate()
-			acmeService.StartLoop()
-
-			update := acmeService.NotificationChannel()
-			xds := xds_service.NewXdsService()
-			ctx := context.Background()
-			lis, err := net.Listen("tcp", c.String("xds-listen"))
-			if err != nil {
-				panic(err)
-			}
-
-			stop := make(chan struct{})
-			go func() {
-				err = xds.RunServer(ctx, lis, update)
-				if err != nil {
-					panic(err)
-				}
-				stop <- struct{}{}
-			}()
-
-			acmeService.FireNotification()
-
-			<-stop
-			return nil
+		Action: CmdStart,
+		Commands: []*cli.Command{
+			{
+				Name:  "export",
+				Usage: "export cert, keys file from store",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:     "name",
+						Usage:    "target configure name",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:  "dest",
+						Usage: "output directory",
+						Value: ".",
+					},
+				},
+				Action: CmdExport,
+			},
 		},
 	}
 

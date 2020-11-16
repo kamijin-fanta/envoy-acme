@@ -63,6 +63,16 @@ func main() {
 				EnvVars: []string{"STORE_CONSUL_PREFIX"},
 				Value:   "envoy-acme-sds/default",
 			},
+			&cli.StringFlag{
+				Name:    "log-level",
+				EnvVars: []string{"LOG_LEVEL"},
+				Value:   "info",
+			},
+			&cli.StringFlag{
+				Name:    "log-format",
+				EnvVars: []string{"LOG_FORMAT"},
+				Value:   "text",
+			},
 		},
 		Action: CmdStart,
 		Commands: []*cli.Command{

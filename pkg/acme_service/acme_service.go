@@ -14,7 +14,7 @@ import (
 	"github.com/go-acme/lego/v4/registration"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
-	"log"
+	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 	"time"
@@ -25,14 +25,16 @@ type AcmeService struct {
 	SitesConfig         *common.SitesConfig
 	Store               store.Store
 	notificationChannel chan *common.Notification
+	logger              *logrus.Entry
 }
 
-func NewAcmeService(config *AcmeProcessConfig, sitesConfig *common.SitesConfig, store store.Store) *AcmeService {
+func NewAcmeService(config *AcmeProcessConfig, sitesConfig *common.SitesConfig, store store.Store, logger *logrus.Logger) *AcmeService {
 	return &AcmeService{
 		Config:              config,
 		SitesConfig:         sitesConfig,
 		Store:               store,
 		notificationChannel: make(chan *common.Notification),
+		logger:              logger.WithField("component", "acme_service"),
 	}
 }
 
@@ -53,32 +55,35 @@ func (a *AcmeService) StartLoop() {
 		for {
 			sitesChanges := false
 			for _, site := range a.SitesConfig.Sites {
+				siteLogger := a.logger.WithField("site", site.Name)
 				func() {
 					for retry := 0; true; retry += 1 {
 						ok, err := a.Store.Lock(a.Config.InstanceId, a.Config.LockTimeout)
 						if err != nil {
-							log.Printf("fetch lock error retry=%d %v %v", retry, ok, err)
+							siteLogger.WithField("retry", retry).WithError(err).Debug("lock error")
 						}
 						if ok {
 							// success!
 							break
 						}
 						if retry > 10 {
-							log.Printf("Skip because the lock cannot be obtained. %s\n", site.Name)
+							siteLogger.WithField("retry", retry).Info("Skip because the lock cannot be obtained.")
 							return
 						}
-						fmt.Printf("fetch lock failed retry=%d wait\n", retry)
-						time.Sleep(5 * time.Second)
+						siteLogger.WithField("retry", retry).Debug("lock failed")
+						wait := 5 * time.Second
+						siteLogger.WithField("duration", wait.String()).Debug("wait for lock")
+						time.Sleep(wait)
 					}
 					defer a.Store.Release(a.Config.InstanceId)
-					fmt.Printf("get lock %s\n", a.Config.InstanceId)
+					siteLogger.WithField("instance", a.Config.InstanceId).Debug("success lock")
 
 					defer func() {
 						if e := recover(); e != nil {
-							log.Printf("fetch certificate panic on %s %v\n", site.Name, e)
+							siteLogger.WithField("error", e).Warn("panic fetch certificate")
 						}
 					}()
-					fmt.Printf("Start check certificate for %s\n", site.Name)
+					siteLogger.Debug("check certificate")
 
 					// unset all relative env vars
 					for _, site := range a.SitesConfig.Sites {
@@ -87,9 +92,15 @@ func (a *AcmeService) StartLoop() {
 							os.Unsetenv(vars[0])
 						}
 					}
-					result := a.FetchCertificate(site)
+					result, err := a.FetchCertificate(site)
+					if err != nil {
+						siteLogger.WithError(err).Warn("renewal error")
+					}
 					if result {
 						sitesChanges = true
+						siteLogger.Info("renewal success")
+					} else {
+						siteLogger.Info("not need renewal")
 					}
 				}()
 			}
@@ -105,37 +116,35 @@ func (a *AcmeService) StartLoop() {
 	}()
 }
 
-func (a *AcmeService) FetchCertificate(site *common.Site) bool {
+func (a *AcmeService) FetchCertificate(site *common.Site) (bool, error) {
+	siteLogger := a.logger.WithField("site", site.Name)
+
 	resource, err := a.Store.FetchResource(site.Name)
 	if errors.Is(err, store.ErrNotFoundCertificate) {
 		// nop
 	} else if err != nil {
-		log.Fatalf("fetch resource error %v", err)
+		return false, fmt.Errorf("fetch resource error %w", err)
 	} else {
 		// check expiration date
 		certs, err := resource.ExtractCertificate()
 		if err != nil {
-			log.Fatalf("extract certs error %v", err)
+			return false, fmt.Errorf("extract certs error %w", err)
 		}
-		if len(certs) == 0 {
-			log.Fatalf("certs not found")
+		if len(certs) != 0 {
+			if !needRenewal(certs[0], a.Config.RemainDays) {
+				return false, nil
+			}
 		}
-
-		if !needRenewal(certs[0], a.Config.RemainDays) {
-			log.Println("not need renewal")
-			return false
-		}
-		log.Println("need renewal")
 	}
 
 	account, err := a.Store.FetchUser(a.Config.CaDir, site.Email)
 	if errors.Is(err, store.ErrNotFoundUser) {
 		// regist new user
-		log.Println("generate user private key")
+		siteLogger.WithField("email", site.Email).Info("generate user private key")
 
 		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			log.Fatal(err) // todo fix
+			return false, fmt.Errorf("error generate private key %w", err)
 		}
 
 		newAccount := store.NewAccount(site.Email, privateKey)
@@ -145,22 +154,22 @@ func (a *AcmeService) FetchCertificate(site *common.Site) bool {
 
 		client, err := lego.NewClient(clientConfig)
 		if err != nil {
-			log.Fatal(err)
+			return false, fmt.Errorf("error create new lego client %w", err)
 		}
 
 		reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
 		if err != nil {
-			log.Fatal(err)
+			return false, fmt.Errorf("error acme user registration %w", err)
 		}
 		newAccount.Registration = reg
 		account = newAccount
 
 		err = a.Store.WriteUser(a.Config.CaDir, newAccount)
 		if err != nil {
-			log.Fatalf("write user error %v", err)
+			return false, fmt.Errorf("error write new user %w", err)
 		}
 	} else if err != nil {
-		log.Fatalf("error on fetch user %v", err)
+		return false, fmt.Errorf("error on fetch user %w", err)
 	}
 
 	clientConfig := lego.NewConfig(account)
@@ -169,50 +178,47 @@ func (a *AcmeService) FetchCertificate(site *common.Site) bool {
 
 	client, err := lego.NewClient(clientConfig)
 	if err != nil {
-		log.Fatal(err) // todo fix
+		return false, fmt.Errorf("error create new lego client %w", err)
 	}
 
 	// set EnvVars
 	for _, env := range site.LegoEnv {
 		vars := strings.Split(env, "=")
 		if len(vars) != 2 {
-			fmt.Printf("ignore invalid env vars %s\n", env)
+			siteLogger.WithField("variable", env).Info("ignore invalid env vars")
 			continue
 		}
 		err := os.Setenv(vars[0], vars[1])
-		fmt.Printf("set env %v\n", vars[0])
+		siteLogger.WithField("key", vars[0]).Trace("set env var")
 		if err != nil {
 			panic(err)
 		}
 	}
 	provider, err := dns.NewDNSChallengeProviderByName(site.Provider)
 	if err != nil {
-		log.Fatal(err) // todo fix
+		return false, fmt.Errorf("error on new provider %w", err)
 	}
 	err = client.Challenge.SetDNS01Provider(provider)
 	if err != nil {
-		log.Fatal(err) // todo fix
+		return false, fmt.Errorf("error on set provider %w", err)
 	}
-
-	fmt.Printf("start acme processes...\n")
 
 	request := certificate.ObtainRequest{
 		Domains: site.Domains,
 		Bundle:  true,
 	}
+	siteLogger.WithField("request", request).Debug("start obtain request")
 	certificates, err := client.Certificate.Obtain(request)
 	if err != nil {
-		log.Fatal(err) // todo fix
+		return false, fmt.Errorf("error obtain certificate %w", err)
 	}
 	certResource := store.NewStoreResource(certificates)
 
-	fmt.Printf("%s\n", certificates.Certificate)
-
 	err = a.Store.WriteResource(site.Name, certResource)
 	if err != nil {
-		log.Fatalf("issue certificate error %v", err) // todo fix
+		return false, fmt.Errorf("issue certificate error %w", err)
 	}
-	return true
+	return true, nil
 }
 
 func (a *AcmeService) FireNotification() {
@@ -220,7 +226,7 @@ func (a *AcmeService) FireNotification() {
 	for _, site := range a.SitesConfig.Sites {
 		cert, err := a.Store.FetchResource(site.Name)
 		if err != nil {
-			fmt.Printf("error on fetch resource %v\n", err)
+			a.logger.WithError(err).Warn("error on fetch resource")
 			continue
 		}
 		certs = append(certs, cert)

@@ -11,6 +11,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"net"
@@ -18,10 +19,12 @@ import (
 )
 
 type XdsService struct {
+	logger *logrus.Entry
 }
 
-func NewXdsService() *XdsService {
+func NewXdsService(logger *logrus.Logger) *XdsService {
 	svc := &XdsService{
+		logger: logger.WithField("component", "xds_service"),
 	}
 	return svc
 }
@@ -39,7 +42,7 @@ func (x *XdsService) RunServer(ctx context.Context, listener net.Listener, updat
 			md, ok := metadata.FromIncomingContext(ctx)
 			if ok {
 				by, _ := json.Marshal(md)
-				fmt.Printf("stream request %s\n", by)
+				x.logger.WithField("request", string(by)).Debugf("stream request")
 			}
 			return nil
 		},
@@ -65,7 +68,7 @@ func (x *XdsService) RunServer(ctx context.Context, listener net.Listener, updat
 	grpcServer := grpc.NewServer()
 	envoy_service_secret_v3.RegisterSecretDiscoveryServiceServer(grpcServer, srv)
 
-	fmt.Printf("start server with [%s]\n", listener.Addr().String())
+	x.logger.WithField("addr", listener.Addr().String()).Info("start server")
 	return grpcServer.Serve(listener)
 }
 

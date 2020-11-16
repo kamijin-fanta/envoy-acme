@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/registration"
 )
@@ -50,7 +49,6 @@ func (a *AccountKey) UnmarshalJSON(in []byte) error {
 	var certStr string
 	decerr := json.Unmarshal(in, &certStr)
 	if decerr != nil {
-		fmt.Println(decerr)
 		return decerr
 	}
 

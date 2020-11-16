@@ -14,10 +14,23 @@ import (
 	"github.com/go-acme/lego/v4/registration"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 	"time"
+)
+
+var (
+	renewalSuccessCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: common.PrometheusNamespace,
+		Name:      "renewal_success",
+	})
+	renewalFailedCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: common.PrometheusNamespace,
+		Name:      "renewal_failed",
+	})
 )
 
 type AcmeService struct {
@@ -95,10 +108,13 @@ func (a *AcmeService) StartLoop() {
 					result, err := a.FetchCertificate(site)
 					if err != nil {
 						siteLogger.WithError(err).Warn("renewal error")
+						renewalFailedCounter.Inc()
+						return
 					}
 					if result {
 						sitesChanges = true
 						siteLogger.Info("renewal success")
+						renewalSuccessCounter.Inc()
 					} else {
 						siteLogger.Info("not need renewal")
 					}

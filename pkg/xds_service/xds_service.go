@@ -11,11 +11,20 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"net"
 	"time"
+)
+
+var (
+	xdsStreamOpenCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: common.PrometheusNamespace,
+		Name:      "xds_stream_open",
+	})
 )
 
 type XdsService struct {
@@ -44,6 +53,7 @@ func (x *XdsService) RunServer(ctx context.Context, listener net.Listener, updat
 				by, _ := json.Marshal(md)
 				x.logger.WithField("request", string(by)).Debugf("stream request")
 			}
+			xdsStreamOpenCounter.Inc()
 			return nil
 		},
 		StreamClosedFunc:   nil,

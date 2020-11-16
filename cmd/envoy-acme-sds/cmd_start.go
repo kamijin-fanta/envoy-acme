@@ -6,11 +6,13 @@ import (
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/acme_service"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
 	"github.com/kamijin-fanta/envoy-acme-sds/pkg/xds_service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/xid"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 )
 
@@ -56,16 +58,26 @@ func CmdStart(c *cli.Context) error {
 	update := acmeService.NotificationChannel()
 	xds := xds_service.NewXdsService(logger)
 	ctx := context.Background()
-	lis, err := net.Listen("tcp", c.String("xds-listen"))
+	xdsLis, err := net.Listen("tcp", c.String("xds-listen"))
 	if err != nil {
 		logger.WithError(err).Fatal("failed open xds listener")
 	}
 
 	stop := make(chan struct{})
 	go func() {
-		err = xds.RunServer(ctx, lis, update)
+		err = xds.RunServer(ctx, xdsLis, update)
 		if err != nil {
-			panic(err)
+			logger.WithError(err).Fatal("failed run xds server")
+		}
+		stop <- struct{}{}
+	}()
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		addr := c.String("metrics-listen")
+		logger.WithField("addr", addr).Info("start metrics http server")
+		err := http.ListenAndServe(addr, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("failed run metrics http server")
 		}
 		stop <- struct{}{}
 	}()

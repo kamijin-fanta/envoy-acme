@@ -17,3 +17,5 @@ type Site struct {
 	Domains  []string `yaml:"domains"`
 	LegoEnv  []string `yaml:"legoenv"`
 }
+
+const PrometheusNamespace = "envoy_acme_sds"

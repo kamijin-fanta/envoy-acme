@@ -22,8 +22,9 @@ require (
 	github.com/linode/linodego v0.24.0 // indirect
 	github.com/miekg/dns v1.1.35 // indirect
 	github.com/oracle/oci-go-sdk v24.3.0+incompatible // indirect
+	github.com/prometheus/client_golang v1.8.0
 	github.com/rs/xid v1.2.1
-	github.com/sirupsen/logrus v1.4.2
+	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.6.1
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/vultr/govultr v1.1.1 // indirect

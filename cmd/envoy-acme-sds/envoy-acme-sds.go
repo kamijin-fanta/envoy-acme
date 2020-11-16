@@ -18,35 +18,14 @@ func main() {
 		Name: "envoy-acme-sds",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:    "ca-dir",
-				Value:   "https://acme-staging-v02.api.letsencrypt.org/directory", // todo
-				EnvVars: []string{"CA_DIR"},
-			},
-			&cli.IntFlag{
-				Name:    "cert-days",
-				EnvVars: []string{"CERT_DAYS"},
-				Value:   25,
+				Name:    "log-level",
+				EnvVars: []string{"LOG_LEVEL"},
+				Value:   "info",
 			},
 			&cli.StringFlag{
-				Name:    "xds-listen",
-				EnvVars: []string{"XDS_LISTEN"},
-				Value:   "127.0.0.1:20000",
-			},
-			&cli.DurationFlag{
-				Name:    "interval",
-				EnvVars: []string{"INTERVAL"},
-				Value:   1 * time.Hour,
-			},
-			&cli.DurationFlag{
-				Name:    "lock-timeout",
-				EnvVars: []string{"LOCK_TIMEOUT"},
-				Value:   10 * time.Minute,
-			},
-			&cli.StringFlag{
-				Name:    "config",
-				Aliases: []string{"c"},
-				EnvVars: []string{"CONFIG_FILE"},
-				Value:   "sites.yaml",
+				Name:    "log-format",
+				EnvVars: []string{"LOG_FORMAT"},
+				Value:   "text",
 			},
 			&cli.StringFlag{
 				Name:    "store",
@@ -63,19 +42,52 @@ func main() {
 				EnvVars: []string{"STORE_CONSUL_PREFIX"},
 				Value:   "envoy-acme-sds/default",
 			},
-			&cli.StringFlag{
-				Name:    "log-level",
-				EnvVars: []string{"LOG_LEVEL"},
-				Value:   "info",
-			},
-			&cli.StringFlag{
-				Name:    "log-format",
-				EnvVars: []string{"LOG_FORMAT"},
-				Value:   "text",
-			},
 		},
-		Action: CmdStart,
 		Commands: []*cli.Command{
+			{
+				Name:  "start",
+				Usage: "start sds server",
+				Flags: []cli.Flag{
+
+					&cli.StringFlag{
+						Name:    "ca-dir",
+						Value:   "https://acme-v02.api.letsencrypt.org/directory",
+						EnvVars: []string{"CA_DIR"},
+					},
+					&cli.IntFlag{
+						Name:    "cert-days",
+						EnvVars: []string{"CERT_DAYS"},
+						Value:   25,
+					},
+					&cli.StringFlag{
+						Name:    "xds-listen",
+						EnvVars: []string{"XDS_LISTEN"},
+						Value:   "127.0.0.1:20000",
+					},
+					&cli.DurationFlag{
+						Name:    "interval",
+						EnvVars: []string{"INTERVAL"},
+						Value:   1 * time.Hour,
+					},
+					&cli.DurationFlag{
+						Name:    "lock-timeout",
+						EnvVars: []string{"LOCK_TIMEOUT"},
+						Value:   10 * time.Minute,
+					},
+					&cli.StringFlag{
+						Name:    "config",
+						Aliases: []string{"c"},
+						EnvVars: []string{"CONFIG_FILE"},
+						Value:   "sites.yaml",
+					},
+					&cli.StringFlag{
+						Name:    "metrics-listen",
+						EnvVars: []string{"METRICS_LISTEN"},
+						Value:   "127.0.0.1:20001",
+					},
+				},
+				Action: CmdStart,
+			},
 			{
 				Name:  "export",
 				Usage: "export cert, keys file from store",

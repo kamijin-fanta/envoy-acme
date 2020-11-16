@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
+	"github.com/kamijin-fanta/envoy-acme/pkg/store"
 	"io/ioutil"
 	"net/url"
 	"os"

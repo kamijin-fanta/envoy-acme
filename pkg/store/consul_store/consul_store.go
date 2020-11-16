@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/consul/api"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
+	"github.com/kamijin-fanta/envoy-acme/pkg/store"
 	"net/url"
 	"path"
 	"strings"

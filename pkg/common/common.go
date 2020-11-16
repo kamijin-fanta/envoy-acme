@@ -1,6 +1,6 @@
 package common
 
-import "github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
+import "github.com/kamijin-fanta/envoy-acme/pkg/store"
 
 type Notification struct {
 	Certificates []*store.Certificates

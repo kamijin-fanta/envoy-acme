@@ -15,7 +15,7 @@ func main() {
 	}
 
 	app := &cli.App{
-		Name: "envoy-acme-sds",
+		Name: "envoy-acme",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "log-level",
@@ -40,7 +40,7 @@ func main() {
 			&cli.StringFlag{
 				Name:    "store-consul-prefix",
 				EnvVars: []string{"STORE_CONSUL_PREFIX"},
-				Value:   "envoy-acme-sds/default",
+				Value:   "envoy-acme/default",
 			},
 		},
 		Commands: []*cli.Command{

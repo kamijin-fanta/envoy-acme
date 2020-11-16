@@ -1,4 +1,4 @@
-module github.com/kamijin-fanta/envoy-acme-sds
+module github.com/kamijin-fanta/envoy-acme
 
 go 1.15
 

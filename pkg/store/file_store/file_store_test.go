@@ -5,7 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"github.com/go-acme/lego/v4/certificate"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
+	"github.com/kamijin-fanta/envoy-acme/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"

@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"github.com/ghodss/yaml"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/acme_service"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/common"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/xds_service"
+	"github.com/kamijin-fanta/envoy-acme/pkg/acme_service"
+	"github.com/kamijin-fanta/envoy-acme/pkg/common"
+	"github.com/kamijin-fanta/envoy-acme/pkg/xds_service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/xid"
 	"github.com/sirupsen/logrus"

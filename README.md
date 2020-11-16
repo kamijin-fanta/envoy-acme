@@ -1,4 +1,4 @@
-# envoy-acme-sds
+# envoy-acme
 
 Obtain the certificate from Let's encrypt and configure it on the Envoy Proxy through SDS.
 
@@ -7,14 +7,14 @@ Currently, only DNS01 using Lego is supported. https://go-acme.github.io/lego/dn
 
 ## Commands usage
 
-`envoy-acme-sds --help`
+`envoy-acme --help`
 
 ```
 NAME:
-   envoy-acme-sds - A new cli application
+   envoy-acme - A new cli application
 
 USAGE:
-   envoy-acme-sds [global options] command [command options] [arguments...]
+   envoy-acme [global options] command [command options] [arguments...]
 
 COMMANDS:
    start    start sds server
@@ -26,18 +26,18 @@ GLOBAL OPTIONS:
    --log-format value           (default: "text") [$LOG_FORMAT]
    --store value                (default: "consul") [$STORE]
    --store-file-base value      (default: "./data") [$STORE_FILE_BASE]
-   --store-consul-prefix value  (default: "envoy-acme-sds/default") [$STORE_CONSUL_PREFIX]
+   --store-consul-prefix value  (default: "envoy-acme/default") [$STORE_CONSUL_PREFIX]
    --help, -h                   show help (default: false)
 ```
 
-`envoy-acme-sds start --help`
+`envoy-acme start --help`
 
 ```
 NAME:
-   envoy-acme-sds start - start sds server
+   envoy-acme start - start sds server
 
 USAGE:
-   envoy-acme-sds start [command options] [arguments...]
+   envoy-acme start [command options] [arguments...]
 
 OPTIONS:
    --ca-dir value            (default: "https://acme-staging-v02.api.letsencrypt.org/directory") [$CA_DIR]
@@ -50,14 +50,14 @@ OPTIONS:
    --help, -h                show help (default: false)
 ```
 
-`envoy-acme-sds start --help`
+`envoy-acme start --help`
 
 ```
 NAME:
-   envoy-acme-sds export - export cert, keys file from store
+   envoy-acme export - export cert, keys file from store
 
 USAGE:
-   envoy-acme-sds export [command options] [arguments...]
+   envoy-acme export [command options] [arguments...]
 
 OPTIONS:
    --name value  target configure name

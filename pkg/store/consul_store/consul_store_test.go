@@ -6,7 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/go-acme/lego/v4/certificate"
-	"github.com/kamijin-fanta/envoy-acme-sds/pkg/store"
+	"github.com/kamijin-fanta/envoy-acme/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -17,7 +17,7 @@ func TestConsulStore(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	keyPrefix := fmt.Sprintf("envoy-acme-sds/test-%d", time.Now().Unix())
+	keyPrefix := fmt.Sprintf("envoy-acme/test-%d", time.Now().Unix())
 	consulStore, err := NewConsulStore(keyPrefix)
 	require.Nil(err)
 

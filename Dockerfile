@@ -4,8 +4,8 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY * ./
-RUN CGO_ENABLED=0 go build -o envoy-acme ./cmd/envoy-ecme/.
+COPY . ./
+RUN CGO_ENABLED=0 go build -o envoy-acme ./cmd/envoy-acme/.
 
 
 FROM alpine:3.11

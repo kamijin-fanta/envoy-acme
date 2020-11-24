@@ -121,9 +121,7 @@ func (a *AcmeService) StartLoop() {
 				}()
 			}
 
-			if sitesChanges {
-				a.FireNotification()
-			}
+			a.FireNotification()
 
 			// wait for timer
 			t := time.NewTimer(a.Config.Interval)

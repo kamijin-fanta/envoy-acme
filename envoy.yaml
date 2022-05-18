@@ -17,14 +17,16 @@ static_resources:
   #       filename: hoge.crt
   #     private_key:
   #       filename: hoge.key
+static_resources:
   listeners:
   - name: listener_0
     address:
-      socket_address: { address: 0.0.0.0, port_value: 8123 }
+      socket_address: { address: 0.0.0.0, port_value: 443 }
     filter_chains:
     - filters:
-      - name: envoy.http_connection_manager
-        config:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
           route_config:
             name: route
@@ -38,34 +40,33 @@ static_resources:
                   body:
                     inline_string: hello envoy
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
       transport_socket:
         name: envoy.transport_sockets.tls
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificate_sds_secret_configs:
-            - name: "metrics.dempa.moe"
+            - name: "example.com"
               sds_config:
                 resource_api_version: v3
-                api_config_source:
+                api_config_source:   
                   api_type: GRPC
-                  transport_api_version: v3
                   grpc_services:
                     envoy_grpc:
-                      cluster_name: xds_cluster
-                    initial_metadata:
-                      - key: x-hoge-token
-                        value: fugafugafuga
+                      cluster_name: envoy_acme_sds_cluster
+                  transport_api_version: V3
+
   clusters:
-  - name: xds_cluster
+  - name: envoy_acme_sds_cluster
     connect_timeout: 0.25s
-    lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
     load_assignment:
-      cluster_name: xds_cluster
+      cluster_name: envoy_acme_sds_cluster
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
-              socket_address: {address: 127.0.0.1, port_value: 20000 }
+              socket_address:
+                address: 127.0.0.1
+                port_value: 20000

@@ -73,16 +73,17 @@ OPTIONS:
 # site.yaml
 sites:
   - name: setting-names     # It will be the setting name of SDS
-    provider: sakuracloud   # DNS-01 provider name in Lego
+    provider: route53   # DNS-01 provider name in Lego
     email: test@you.com     # Your email address
     domains:                # Target domains
       - "example.com"
       - "*.example.com"
     legoenv:                # Environment variables required by the provider
-      - SAKURACLOUD_ACCESS_TOKEN=********-****-****-****-**********
-      - SAKURACLOUD_ACCESS_TOKEN_SECRET=****************************************************************
-      - SAKURACLOUD_POLLING_INTERVAL=20
-      - SAKURACLOUD_PROPAGATION_TIMEOUT=300
+      - AWS_REGION=US-EAST-1=********-****-****-****-**********
+      - AWS_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXX
+      - AWS_SECRET_ACCESS_KEY=****************************************************************
+      - AWS_HOSTED_ZONE_ID=XXXXXXXXXXXXXXXX
+
 ```
 
 ### Dot env file

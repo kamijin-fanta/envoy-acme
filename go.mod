@@ -22,14 +22,14 @@ require (
 	github.com/linode/linodego v0.24.0 // indirect
 	github.com/miekg/dns v1.1.35 // indirect
 	github.com/oracle/oci-go-sdk v24.3.0+incompatible // indirect
-	github.com/prometheus/client_golang v1.13.0
+	github.com/prometheus/client_golang v1.8.0
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.6.1
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/vultr/govultr v1.1.1 // indirect
-	go.uber.org/atomic v1.5.0 // indirect
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897 // indirect
+	golang.org/x/net v0.0.0-20201031054903-ff519b6c9102 // indirect
 	google.golang.org/api v0.35.0 // indirect
 	google.golang.org/grpc v1.31.1
 )

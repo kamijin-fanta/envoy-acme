@@ -3,12 +3,13 @@ package consul_store
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/consul/api"
-	"github.com/kamijin-fanta/envoy-acme/pkg/store"
 	"net/url"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/consul/api"
+	"github.com/pfremm/envoy-acme/pkg/store"
 )
 
 var _ store.Store = &ConsulStore{}

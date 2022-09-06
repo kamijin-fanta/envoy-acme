@@ -7,19 +7,20 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/providers/dns"
 	"github.com/go-acme/lego/v4/registration"
-	"github.com/kamijin-fanta/envoy-acme/pkg/common"
-	"github.com/kamijin-fanta/envoy-acme/pkg/store"
+	"github.com/pfremm/envoy-acme/pkg/common"
+	"github.com/pfremm/envoy-acme/pkg/store"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
-	"os"
-	"strings"
-	"time"
 )
 
 var (
@@ -66,7 +67,7 @@ func (a *AcmeService) NotificationChannel() chan *common.Notification {
 func (a *AcmeService) StartLoop() {
 	go func() {
 		for {
-			sitesChanges := false
+			//sitesChanges := false
 			for _, site := range a.SitesConfig.Sites {
 				siteLogger := a.logger.WithField("site", site.Name)
 				func() {
@@ -112,7 +113,7 @@ func (a *AcmeService) StartLoop() {
 						return
 					}
 					if result {
-						sitesChanges = true
+						//sitesChanges = true
 						siteLogger.Info("renewal success")
 						renewalSuccessCounter.Inc()
 					} else {

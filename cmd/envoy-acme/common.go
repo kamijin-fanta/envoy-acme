@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/kamijin-fanta/envoy-acme/pkg/store"
-	"github.com/kamijin-fanta/envoy-acme/pkg/store/consul_store"
-	"github.com/kamijin-fanta/envoy-acme/pkg/store/file_store"
+
+	"github.com/pfremm/envoy-acme/pkg/store"
+	"github.com/pfremm/envoy-acme/pkg/store/consul_store"
+	"github.com/pfremm/envoy-acme/pkg/store/file_store"
 	"github.com/urfave/cli/v2"
 )
 

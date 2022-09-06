@@ -14,7 +14,7 @@ require (
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.1
-	github.com/urfave/cli/v2 v2.14.1
+	github.com/urfave/cli/v2 v2.3.0
 	go.uber.org/atomic v1.5.0 // indirect
 	google.golang.org/api v0.35.0 // indirect
 	google.golang.org/grpc v1.31.1

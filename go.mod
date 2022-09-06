@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/Azure/azure-sdk-for-go v48.1.0+incompatible // indirect
-	github.com/envoyproxy/go-control-plane v0.10.3
+	github.com/envoyproxy/go-control-plane v0.9.7
 	github.com/exoscale/egoscale v1.19.0 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-acme/lego/v4 v4.8.0
@@ -17,5 +17,5 @@ require (
 	github.com/urfave/cli/v2 v2.14.1
 	go.uber.org/atomic v1.5.0 // indirect
 	google.golang.org/api v0.35.0 // indirect
-	google.golang.org/grpc v1.45.0
+	google.golang.org/grpc v1.31.1
 )

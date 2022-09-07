@@ -3,7 +3,7 @@ module github.com/pfremm/envoy-acme
 go 1.19
 
 require (
-	github.com/envoyproxy/go-control-plane v0.9.9
+	github.com/envoyproxy/go-control-plane v0.9.7
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-acme/lego/v4 v4.8.0
 	github.com/hashicorp/consul/api v1.7.0
@@ -13,11 +13,10 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.1
 	github.com/urfave/cli/v2 v2.14.1
-	google.golang.org/grpc v1.36.0
+	google.golang.org/grpc v1.31.1
 )
 
 require (
-	github.com/cncf/xds/go v0.0.0-20210312221358-fbca930ec8ed // indirect
 	github.com/deepmap/oapi-codegen v1.6.1 // indirect
 	github.com/exoscale/egoscale v0.67.0 // indirect
 	github.com/jarcoal/httpmock v1.0.8 // indirect
@@ -48,6 +47,7 @@ require (
 	github.com/census-instrumentation/opencensus-proto v0.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cloudflare/cloudflare-go v0.20.0 // indirect
+	github.com/cncf/udpa/go v0.0.0-20200629203442-efcf912fb354 // indirect
 	github.com/cpu/goacmedns v0.1.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

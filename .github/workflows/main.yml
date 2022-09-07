@@ -27,4 +27,4 @@ jobs:
     - 
       name: Build
       run: |
-        docker buildx build . -t pfremm/auto-southwest-check-in --push --platform=linux/arm64
+        docker buildx build . -t pfremm/envoy-acme --push

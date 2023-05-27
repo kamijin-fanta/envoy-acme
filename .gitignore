@@ -1,3 +1,4 @@
-data/
 .env
+data/
+envoy-acme
 sites.yaml

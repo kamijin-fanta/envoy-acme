@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/registration"
 )

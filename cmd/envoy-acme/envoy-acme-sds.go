@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/joho/godotenv"
-	"github.com/urfave/cli/v2"
 	"log"
 	"os"
 	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
